@@ -1,0 +1,113 @@
+---
+title: "MATH 680: Project Proposal"
+author: "David Fleischer, Annik Gougeon"
+date: "Last Update: `r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+bibliography: references.bib
+header-includes:
+   - \usepackage{amsmath,amsthm,amssymb,mathtools,bm}
+---
+
+\newcommand{\bbeta}{{\bm \beta}}
+\newcommand{\argmin}{{\text{arg min}}}
+\newcommand{\X}{{\mathbb X}}
+\newcommand{\R}{{\mathbb R}}
+\newcommand{\eps}{\varepsilon}
+\renewcommand{\phi}{\varphi}
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+We wish to study the method of nonparametric regression with hierarchical penalization as outlined by @haris2016nonparametric. In particular, wish to investigate its properties, applications, as well as outline suitable classes of optimization techniques for such problems.
+
+## Background
+
+Consider the problem of estimating the relationship between responses $Y = \left[y_1, ..., y_n\right]^T \in \R^n$ and predictors $\X = \left[{\bm x}_1, ..., {\bm x}_n\right]^T \in \R^{n\times p}$, ${\bm x}_i = \left[x_{i1}, ..., x_{ip}\right] \in \R^p$. Suppose that $Y$ and $\X$ are relation through an additive relationship 
+$$
+  y_i = \sum^p_{j = 1} f_j \left(x_{ij}\right) + \epsilon_i.
+$$
+
+The method of estimation outlined herein focuses on a nonparametric method of basis expansion/projection estimators of $Y$. Specifically, for each predictor $X_j = [x_{1j}, ..., x_{nj}]^T \in \R^n$, we generate the expansion of $X_j$ according to a finite set of basis functions $\left\{\psi_k\left(z\right)\right\}^K_{k = 1}$, where $K$ is the truncation level that will be determined data-adaptively (discussed shortly). Let $\Psi^{(j)}_K \in \R^{n\times K}$ be the set of basis functions correspond to predictor $X_j$, with entry $(i, k)^\text{th}$ given by
+$$
+  \Psi^{(j)}_{K, (i,k)} = \psi_k(x_{ij}), \quad 1 \leq k \leq K,\, 1 \leq i \leq n.
+$$
+
+Of present interest is the case of a *polynomial basis expansion* $\psi_k^{(j)}(z) = z^k$ so that the $j^\text{th}$ predictor undergoes the expansion
+$$
+  X_j = 
+  \begin{bmatrix}
+    x_{1j} \\
+    \vdots \\
+    x_{nj}
+  \end{bmatrix}
+  \mapsto
+  \Psi^{(j)}_K 
+  =
+  \begin{bmatrix}
+    \psi_1(x_{1j}) & \psi_2(x_{1j}) & \cdots & \psi_K(x_{1j}) \\
+    \vdots & \vdots & \ddots & \vdots \\
+    \psi_1(x_{nj}) & \psi_2(x_{nj}) & \cdots & \psi_K(x_{nj}) \\
+  \end{bmatrix} 
+  =
+  \begin{bmatrix}
+    x_{1j} & x_{1j}^2 & \cdots & x_{1j}^K \\
+    \vdots & \vdots & \ddots & \vdots \\
+    x_{nj} & x_{nj}^2 & \cdots & x_{nj}^K \\
+  \end{bmatrix}.
+$$
+
+We may estimate the additive functions $f_j(x_{ij})$ by the \underline{sparse additive \texttt{hierbasis}} estimator $\widehat{f}_j\left(x_{ij}\right) = \sum_{k\leq K} \widehat\beta^\texttt{S-hier}_{j,k} \psi_{k}\left(x_{ij}\right)$, $j = 1, ..., p$, such that each $\widehat\bbeta^\texttt{S-hier}_j \in \R^K$ is simultaneously estimated the penalized minimization problem
+\begin{equation}\label{eqn:hierbasis}
+  \left[ \widehat\bbeta^\texttt{S-hier}_1, ..., \widehat\bbeta^\texttt{S-hier}_p \right] = \underset{\bbeta_j \in \R^K}{\argmin} \left\{ \frac{1}{2n} \left\lVert Y - \sum^p_{j = 1} \Psi^{(j)}_K \bbeta_j  \right\rVert^2_2 + \lambda \sum^p_{j = 1} \Omega_j\left(\bbeta_j\right) + \frac{\lambda^2}{\sqrt{n}} \sum^p_{j = 1} \left\lVert \Psi^{(j)}_K \bbeta_j \right\rVert_2 \right\},
+\end{equation}
+
+where
+$$
+  \Omega_j\left(\bbeta_j\right) = \frac{1}{\sqrt{n}}\sum^K_{k = 1} w_k \left\lVert \Psi^{(j)}_{k:K} \bbeta_{j,\,k:K} \right\rVert_2
+$$
+for $w_k = k^m - (k - 1)^m$, $\Psi^{(j)}_{k:K}$ denotes the submatrix of columns $k, k + 1, ..., K$, and $\bbeta_{k:K}$ the corresponding subvector of $\bbeta$. 
+
+The above penalty $\Omega_j$ is designed to provide a data-driven method of truncating the basis complexity to some $K_0 \leq K$, derived from the hierarchical group lasso penalty (@zhao2009composite), leading to hierarchical sparsity of the fitted parameters $\widehat\beta_k = 0 \implies \widehat\beta_{k'} = 0$, for $k' > k$. The second penalization term $\frac{\lambda^2}{n} \sum \left\lVert \Psi^{(j)}_K \bbeta_j \right\rVert_2$ imposes additional sparsity through a linked penalization constant $\lambda^2$.
+
+## Solving for \texttt{hierbasis} Estimators
+
+To solve (\ref{eqn:hierbasis}) @haris2016nonparametric applies the results of  @zhao2009composite, @jenatton2010proximal, @jenatton2011proximal. By writing the problem in the form
+\begin{equation}
+  \min_{v\in \R^p} \left\{ \left\lVert u - v \right\rVert^2_2 + \lambda \Omega(v) \right\},
+\end{equation}
+
+where $\Omega$ is a hierarchical penalty of the form described in @zhao2009composite, we may apply an efficient proximal gradient descent algorithm with complexity $O(p)$ (@jenatton2011proximal).
+
+# Proposal
+
+Of consideration for this project we wish to tackle the following questions:
+
+(1) Can the \texttt{hierbasis} estimator procedure offer a material gain over the lasso estimator (@tibshirani1996regression)? Preliminary tests suggest a marginal sparsity improvement with no worse predictive power, but at the cost of computational complexity.
+
+(2) The \texttt{hierbasis} documentation (@hierbasis) references a mixing parameter $\alpha$ controlling the relative importance of the hierarchical and the sparsity-inducing penalities. How does the manipulation of this parameter affect its performance? Is it feasible to select $\alpha$ through cross-validation?
+
+(3) What is the effect of changing the form of the weights $w_k = k^m - (k - 1)^m$ in the hierarchical penalty $\Omega$?
+
+(4) What other optimization methods be used to solve \texttt{hierbasis}? Can other methods address the convergence issues?
+
+(5) Can the $\ell_1$ norm be implemented in either/both penalities in order to induce stricter sparsity?
+
+\newpage
+# References
+
+
+
+
+
+
+
+
+
+
+
+
+
+

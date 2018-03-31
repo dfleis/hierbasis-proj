@@ -1,0 +1,130 @@
+---
+title: "MATH 680: Project Proposal"
+author: "David Fleischer, Annik Gougeon"
+date: "Last Update: `r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+bibliography: references.bib
+header-includes:
+   - \usepackage{bm}
+---
+
+\newcommand{\bbeta}{{\bm \beta}}
+\newcommand{\argmin}{{\text{arg min}}}
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction 
+
+We wish to investigate the novel nonparameteric regression techniques outlined by @haris2016nonparametric. In particular, we wish to study the method of adaptive truncation through (convex) hierarchical penalization in order to understand its properties, as well as outline suitable classes of optimization techniques for such problems.
+
+## Problem Outline
+
+### Univariate Case
+
+Consider the univariate problem of nonparametric estimation from covariate-response pairs $\{(x_i, y_i)\,\mid\, x_i, y_i \in \mathbb R\}^n_{i = 1}$. We assume that each $y_i$ are related to the corresponding $x_i$ through the functional relationship $y_i = f(x_i) + \epsilon_i$, where $\epsilon_i$ are i.i.d. with zero mean and constant variance. 
+
+Let $Y = [y_1, ..., y_n]^T$ and $X = [x_1, ..., x_n]^T$, and let $\Psi_K \in \mathbb R^{n\times K}$ be the basis expansion of $X$ such that the $(i,k)^\text{th}$ element of $\Psi_K$ is given by
+$$
+  \Psi_{K(i,k)} = \psi_k(x_i), \quad 1 \leq k \leq K,\,1\leq i \leq n
+$$
+
+where $\psi_k$ is the $k^\text{th}$ basis function. For the purposes of hierarchical penalization we assume the $\psi_k$ are ordered by some measure of complexity (i.e., $\psi_1(x) = x$, $\psi_2(x) = x^2$, ...). Then, we model responses $Y$ via the basis expansion/projection estimator $\bbeta$
+$$
+  Y = \Psi_K\bbeta + \epsilon.
+$$
+
+The unpenalized projection estimator is the solution to the minimization problem
+\begin{equation}\label{eqn_proj}
+  \widehat\bbeta^\text{proj} = \underset{\bbeta \in \mathbb R^K}{\argmin} \frac{1}{2n} \lVert Y - \Psi_K \bbeta \rVert^2_2.
+\end{equation}
+
+We should note that the choice of a truncation level $K$ is not immediately obvious. Setting $K$ too large leads to high variance estimates as the dimension of the basis expansion increases, while setting $K$ too small leads to high bias estimates as the basis expansion is unable to capture additional complexity between $Y$ and $X$. The `hierbasis` proposal for this problem (@haris2016nonparametric) is to consider a saturated basis ($K = n$) and apply a hierarchical penalization on (\ref{eqn_proj}) in order to simultaneously select $K$ and estimates of $\bbeta$. In particular, the problem seeks to solve the problem
+\begin{equation}\label{eqn_hier}
+\hat\beta^\texttt{hier} = \underset{\beta \in \mathbb R^n}{\text{arg min}} \left\{ \frac{1}{2 n} \lVert y - \Psi \beta \rVert^2_2 + \lambda \Omega(\beta) \right\}
+\end{equation}
+
+where 
+$$
+  \Omega(\beta) = \frac{1}{\sqrt{n}} \sum^n_{k = 1} w_k \lVert \Psi_{k:n} \bbeta_{k:n}\rVert_2,
+$$
+
+such that $\Psi_{k:n}$ denotes the final $k, k+1, ..., n$ columns of $\Psi_n$, $\bbeta_{k:n}$ the final $k, k+1, ..., n$ entries of $\bbeta$, $w_k = k^m - (k - 1)^m$, and $m$, $\lambda$ are tuning parameters.
+
+is a heirarchical penalty of the class introduced by @zhao2009composite. (to do... @bach2009high, @kim2010tree)
+
+* Introduction/motivation.
+
+* Background material (2-4 papers).
+
+* Why the problem is important/interesting/challenging/worth our time.
+
+* What we wish to accomplish through the scope of the project.
+
+# Proposal
+
+## Solving
+
+To solve (\ref{eqn_hier}) we apply the resualts of @zhao2009composite and @jenatton2010proximal and (via @haris2016nonparametric). In particular, under the basis expansion $\Psi_n \in \mathbb R^{n\times n}$ of $X$, let $\ell = \{1, ..., n\}$ be the set of column indices of $\Psi_n$ and consider $K$ subsets of indices $\ell$
+$$
+  \mathcal G = \{g_1, ..., g_K\}, \quad g_k \subset \ell.
+$$
+
+Denote by ${\bm\beta}_{g_k} = (\beta_j)_{j\in g_k}$ to be the subset of ${\bm\beta}$ corresponding to indices $g_k$. Now, define our general hierarchical penalty $\Omega({\bm \beta})$ by
+$$
+  \Omega({\bm \beta})\ = \sum_{g \in \mathcal G} w_g \lVert {\bm \beta}_{g,0} \rVert_2
+$$
+
+where ${\bm \beta}_{g,0}$ denotes a vector of coefficients whose entries are identical to ${\bm \beta}$ for indices of ${\bf \beta}$ in $g$, and 0 for indices of ${\bf \beta}$ not contained within $g$, i.e.,
+$$
+\begin{cases}
+  \beta_i \in {\bm \beta}_{g,0} & \text{for all } i \in g \\
+   0 \in {\bm \beta}_{g, 0} & \text{for all } i \notin g
+\end{cases}
+$$
+
+Consider the objective function
+$$
+  f(\bbeta) + \lambda \Omega(\bbeta),
+$$
+
+where $f(\bbeta) = \frac{1}{2} \lVert Y - \Psi \bbeta \rVert^2_2$ is our least-squares loss function. In the proximal gradient descent algorithm we linearize $L$ about a current estimate $\bbeta'$ of $\bbeta$, and update $\bbeta$ as the solution to the proximal problem
+$$
+  \underset{\bbeta}{\text{arg min}} \left\{ f\left(\bbeta'\right) + \left(\bbeta - \bbeta'\right)^T \nabla f\left(\bbeta'\right) + \lambda \Omega(\bbeta) + \frac{L}{2} \lVert \bbeta - \bbeta' \rVert^2_2 \right\}.
+$$
+
+Dividing through by the fixed $L$ and removing the constant $f\left(\bbeta'\right)$ we rewrite the above problem as
+$$
+  \underset{\bbeta}{\text{arg min}} \left\{ \frac{1}{L} \left(\bbeta - \bbeta'\right)^T \nabla f\left(\bbeta'\right) + \frac{1}{2} \lVert \bbeta - \bbeta' \rVert^2_2 + \frac{\lambda}{L} \Omega(\bbeta) \right\}
+$$
+$$
+  \underset{\bbeta}{\text{arg min}} \left\{ \frac{1}{L} \bbeta^T \nabla f \left(\bbeta'\right) - \frac{1}{L} {\bbeta'}^T \nabla f \left(\bbeta'\right) + \frac{1}{2} \bbeta^T \bbeta - \bbeta^T\bbeta' + \frac{1}{2}{\bbeta'}^T\bbeta' + \frac{\lambda}{L} \Omega(\bbeta) \right\}
+$$
+$$
+  \underset{\bbeta}{\text{arg min}} \left\{ \frac{1}{L} \bbeta^T \nabla f \left(\bbeta'\right) - \bbeta^T\bbeta' + \frac{1}{2} \bbeta^T \bbeta  + \frac{\lambda}{L} \Omega(\bbeta) \right\}
+$$
+$$
+  \underset{\bbeta}{\text{arg min}} \left\{ \bbeta^T \left[ \frac{1}{L} \nabla f \left(\bbeta'\right) - \bbeta' + \frac{1}{2} \bbeta\right]  + \frac{\lambda}{L} \Omega(\bbeta) \right\}
+$$
+temp
+
+$$
+  \underset{\bbeta}{\text{arg min}} \left\{ \frac{1}{2} \bbeta^T \bbeta - \bbeta^T \left( \bbeta' - \nabla f\left(\bbeta'\right) \right) + \frac{1}{2} \left( {\bbeta'}^T\bbeta' - 2{\bbeta'}^T \nabla f\left(\bbeta'\right) + \nabla f\left(\bbeta'\right)^T \nabla f\left(\bbeta'\right) \right)  + \frac{\lambda}{L} \Omega(\bbeta) \right\}
+$$
+
+$$
+  \underset{\bbeta}{\text{arg min}} \left\{ \frac{1}{2} \bbeta^T \bbeta - \bbeta^T \left( \bbeta' - \nabla f\left(\bbeta'\right) \right) + \frac{1}{2} \left( \bbeta' - \nabla f\left(\bbeta'\right) \right)^T\left( \bbeta' - \nabla f\left(\bbeta'\right) \right)  + \frac{\lambda}{L} \Omega(\bbeta) \right\}
+$$
+
+$$
+  \underset{\bbeta}{\text{arg min}} \left\{ \frac{1}{2} \left( \bbeta - \left( \bbeta' - \nabla f\left(\bbeta'\right) \right) \right)^T \left( \bbeta - \left( \bbeta' - \nabla f\left(\bbeta'\right) \right) \right) \frac{\lambda}{L} \Omega(\bbeta) \right\}
+$$
+$$
+  \underset{\bbeta}{\text{arg min}} \left\{ \frac{1}{2}\lVert \bbeta - \left( \bbeta' - \nabla f\left(\bbeta'\right) \right) \rVert^2_2 + \frac{\lambda}{L} \Omega(\bbeta) \right\}
+$$
+
+\newpage
+# References
+
+
