@@ -1,3 +1,4 @@
 # hierbasis-proj
 
 See: Haris, A., Shojaie, A., & Simon, N. (2016). Nonparametric Regression with Adaptive Truncation via a Convex Hierarchical Penalty. arXiv preprint arXiv:1611.09972.
+Hey
