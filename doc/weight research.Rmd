@@ -29,5 +29,6 @@ In regression problems, we want to find important explanatory factors in predict
 For a vector $\eta \in \mathbb R^d, d \geq 1$, and a symmetric dxd positive definite matrix K, we denote
 $$|| \eta ||_K = (\eta^TK \eta)^{1/2}$$
 (write $|| \eta|| = ||\eta||_{I_d}$).
-Given the positive definite matrices $K_1,...,K_J$,
+Given the positive definite matrices $K_1,...,K_J$, the group lasso estimate is the solution to 
+$$\frac{1}{2} || Y - \sum_{j=1}^J X_j \beta_j||^2 +\lambda \sum_{j=1}^J||\beta_j||_{K_j}.$$
 
