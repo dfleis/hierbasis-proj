@@ -18,8 +18,11 @@ where $Z=(X,Y)$ is the observed data.
 We consider CAP (Composite Absolute Penalties) family of penalties. They are highly customizable and build upon $L_\gamma$ penalties to express both grouped and hierarchical selection. CAP penalties are convex whenever all norms used in its construction are convex. ** While the CAP estimates are not sparser than LASSO, they result in more parsimonious use of degrees of freedom and more stable estimates. 
 
 Let each node correspond to a group of variables $G_k$ and set its descendants to be the groups that should only be added to the model after $G_k$. CAP penalties inforcing the hierarchy can be obtained by setting
-$$T(\beta) = \sum_{m=1}^{\text{nodes}} \alpha_m \cdot ||(\beta_{G_m}, \beta_{\text{all descendants of }G_m}||_{\gamma_m},$$
-with $alpha_m > 0$ for all m. The factor $\alpha_m$ can be used to correct for the effect of a coefficient being present in too many groups 
+$$T(\beta) = \sum_{m=1}^{\text{nodes}} \alpha_m \cdot ||(\beta_{G_m}, \beta_{\text{all descendants of }G_m})||_{\gamma_m},$$
+with $\alpha_m > 0$ for all m. The factor $\alpha_m$ can be used to correct for the effect of a coefficient being present in too many groups 
+
+Theorem:
+If $\gamma_i \geq 1$, then $T(\beta)$ is convex. If, in addition, the loss function L is convex in $\beta$, the objective function of the CAP optimization problem is convex. 
 
 # Notes on Group Lasso
 
