@@ -123,6 +123,15 @@ library(hierbasis2)
 
 # Discussion
 
+It is important to mention the convexity properties contained within this problem. First, we note that the hierbasis penalty, $\Omega(\beta)$ is of the hierarchical group lasso form (Zhao). That is, it belongs to the CAP (Composite Absolute Penalties) family of penalties, which enables the solution to achieve hierarchical sparsity. According to Zhao et al., CAP estimates lead to stable estimates with more effective use of degrees of freedom. However, they do not generally result in sparser estimates than LASSO (ref). 
+
+We define the CAP penalty for hierarichal solution. Introduce a node that corresponds to some group of variables, say $G_k$, and let there be a total of $n$ nodes. For every group $G_k$, define $G_{k:n}$ as the groups that should only be added to the model after $G_k$. For example, in a model with both main and interaction effects, the group of interaction effects can only be added after its main effects are included in the model. In the hierbasis case, this consists of the higher order terms of the set of basis functions, $\psi_n$. 
+
+Then, a CAP penalty inforcing hierarchy can be defined as
+$$T(\beta) = \sum_{i=1}^n \alpha_i \cdot \left\lVert ( \beta_{G_i}, \beta_{G_{i:n}})\right\rVert_{\gamma_i},$$
+where $\alpha_m >0, \forall m$ and $1 \leq \gamma_i < \infty$. Note that $\alpha_m$ is a correction factor in the case that a coefficient appears in numerous groups. An important theorem (maybe reformat this) in Zhao states that "If $\gamma_i \geq 1, \forall i=1,...n,$ then $T(\beta)$ is convex. Furthermore, if the loss function L is convex in $\beta$, the objective function of the CAP optimization problem is convex." It follows that $\hat{\beta}^{\text{A-hier}}_1,..., \hat{\beta}^{\text{A-hier}}_p$ is a convex function. 
+
+
 \newpage
 # References
 
