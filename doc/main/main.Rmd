@@ -1,0 +1,130 @@
+---
+title: "Investigation of Sparse Hierarchical Regularization for Basis Expansion Methods"
+subtitle: "Exploration and Expansion Regression via `HierBasis`"
+author: 
+  David Fleischer
+  Annik Gougeon
+date: "Last Update: `r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+bibliography: ../references/references.bib
+header-includes:
+   - \usepackage{amsmath,amsthm,amssymb,mathtools,bm}
+---
+
+\newcommand{\bbeta}{{\bm \beta}}
+\newcommand{\argmin}{{\text{arg min}}}
+\newcommand{\X}{{\mathbb X}}
+\newcommand{\R}{{\mathbb R}}
+\newcommand{\eps}{\varepsilon}
+\renewcommand{\epsilon}{\varepsilon}
+\renewcommand{\phi}{\varphi}
+\renewcommand{\bbeta}{\bm \beta} 
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+The method of nonparametric regression regularization described in @haris2016nonparametric provides a flexible framework and implementation of a sparse hierarchical penalty via the `R` package `HierBasis`. This proposal offered by outlines a convex penaltization and estimation technique that is suggested to be well-suited to high-dimensional problems. In particular, we wish to verify and expand upon the `HierBasis` framework in the context of sparse additive modelling, focusing on the problem of prediction of a continuous response and variable selection.
+
+## Problem Description
+
+We restrict the focus of this project to focus on the problem of regression of a continuous response $y = \left[ y_n, ..., y_n \right] \in \R^n$ on a high-dimensional design matrix $\X = \left[ {\bm x}_1, ..., {\bm x}_n \right]^T = \left[ X_1, ..., X_p \right] \in \R^{n\times p}$, such that
+\begin{align*}
+  {\bm x}_i &= \left[ x_{i1}, ..., x_{ip} \right] \quad \text{(observation $i$)} \\
+  X_j &= \left[ x_{1j}, ..., x_{nj} \right]^T \quad \text{(predictor $j$)}.
+\end{align*}
+
+We consider the problem of estimating additive components $\left\{f_j\right\}^p_{j = 1}$ of the additive model
+$$
+  y_i = \sum^p_{j = 1} f_j\left(x_{ij}\right) + \eps_i,
+$$
+
+for a sparse set of active features embedded within the design matrix $\X$. The proposal offered by @haris2016nonparametric considers the class of basis expansion estimators (@cencov1962estimation) defined by a finite set of basis functions $\left\{ \psi_k(z) \right\}^K_{k = 1}$, with some notion of increasing complexity (in $k$) and for a truncation level $K$ to be adaptively selected. Let $\Psi^{(j)}_K \in \R^{n\times K}$ be the basis expansion corresponding to the $j^\text{th}$ predictor $X_j$, with $(i, k)^{th}$ entry associated with observation $x_{ij}$ and basis function $\psi_k$,
+$$
+  \Psi^{(j)}_{K,(i, k)} = \psi_k(x_{ij}), \quad 1 \leq k \leq K,~1 \leq i \leq n.
+$$
+Then, through the basis expansion functions, the design matrix $\X \in \R^{n\times p}$ maps to a set of $p$ $(n\times K)$ matrices 
+$$
+  \X \stackrel{\psi}{\mapsto} \left\{ \Psi^{(j)}_K \in \R^{n\times K} \right\}^p_{j = 1}.
+$$
+
+Of present interest is the set of polynomial basis functions $\left\{ \psi_k(z)\right\}^K_{k = 1} = \left\{ z^k\right\}^K_{k = 1}$ so that
+$$
+  X_j = 
+  \begin{bmatrix}
+    x_{1j} \\
+    \vdots \\
+    x_{nj}
+  \end{bmatrix} 
+  \mapsto
+  \Psi^{(j)}_{K} =
+ \begin{bmatrix}
+    \psi_1(x_{1j}) & \psi_2(x_{1j}) & \cdots & \psi_K(x_{1j}) \\
+    \vdots & \vdots & \ddots & \vdots \\
+    \psi_1(x_{nj}) & \psi_2(x_{nj}) & \cdots & \psi_K(x_{nj}) \\
+  \end{bmatrix} 
+  =
+  \begin{bmatrix}
+    x_{1j} & x_{1j}^2 & \cdots & x_{1j}^K \\
+    \vdots & \vdots & \ddots & \vdots \\
+    x_{nj} & x_{nj}^2 & \cdots & x_{nj}^K \\
+  \end{bmatrix}.
+$$
+
+We estimate the additive components $f_j$ by the \underline{s}parse \underline{a}dditive `HierBasis` estimator $\widehat f_j$ given by
+$$
+  \widehat f_j(x_{ij}) = \sum^K_{k = 1} \widehat\beta^\texttt{SA-hier}_{j, k} \psi_k(x_{ij}), \quad j = 1, ..., p,
+$$
+
+such that the $j = 1, ..., p$ coefficient vectors $\widehat\bbeta^\texttt{SA-hier}_{j} = \left[ \widehat\beta^\texttt{SA-hier}_{j, 1}, ..., \widehat\beta^\texttt{SA-hier}_{j, K} \right] \in \R^K$ are simultaneously estimated by the minimization problem
+\begin{equation}\label{eqn:HierBasis}
+ \left[\widehat\bbeta^\texttt{SA-hier}_1, ..., \widehat\bbeta^\texttt{SA-hier}_p \right] = \underset{\bbeta_1, ..., \bbeta_p}{\argmin} \left\{ \frac{1}{2n} \left\lVert Y - \sum^p_{j = 1} \Psi^{(j)}_K \bbeta_j \right\rVert^2_2 + \lambda \sum^p_{j = 1} \Omega_j\left(\beta_j\right) + \frac{\lambda^2}{\sqrt{n}} \sum^p_{j = 1} \left\lVert \Psi^{(j)}_K \bbeta_j \right\rVert_2 \right\},
+\end{equation}
+
+where
+$$
+\Omega_j(\bbeta_j) = \frac{1}{\sqrt{n}} \sum^K_{k = 1} w_k \left\lVert \Psi^{(j)}_{k:K} \bbeta_{j,k:K} \right\rVert_2,
+$$
+
+for $w_k = k^m = (k - 1)^m$ penalization weights for the $k^\text{th}$-order basis estimator, $\Psi^{(j)}_{k:K}$ denotes the submatrix of columns $k, k + 1, ..., K$ of $\Psi^{(j)}_K$, and $\bbeta_{j, k:K}$ denotes the corresponding subvector of $\bbeta_j$.
+
+The penalty described in (\ref{eqn:HierBasis}) is defined by two terms. The first term containing $\Omega_j$'s is designed to provide a data-driven method of selecting the basis complexity/truncating the degree of the basis functions to some adaptively selected level $K_0 \leq K$. This term is derived from the hierarchical group lasso penalty (@zhao2009composite) and leads to hierarchical sparsity of the fitted parameters. That is, $\widehat\beta_{j,k} = 0 \implies \widehat\beta_{j, k'} = 0$ for all $k' \geq k$. 
+
+The second term in the sparse additive `HierBasis` penalty $\frac{\lambda^2}{\sqrt{n}} \sum^p_{j = 1} \left\lVert \Psi^{(j)}_K \bbeta_j \right\rVert_2$ imposes sparsity across the predictors $X_1, ..., X_p$ and induces additional sparsity across the solution space $\left\{ \widehat\bbeta^\texttt{SA-hier}_j \right\}^p_{j = 1}$.
+
+## Proposal
+
+# Methods
+
+## Proximal Methods for the `HierBasis` Penalty
+
+## The `hierbasis2` Package
+
+We have create a companion package to `HierBasis`, named `hierbasis2`, in order to implement the above tests and features of the above proposal. This new package retains all of the user-facing functionality of the original `HierBasis` package, but now permits the user to manipulate some additional parameters, as well as introducing some new functions. That is, the new library has been designed with this project in mind, allowing us to explore the properties of the original `HierBasis` package in a modular, readable, and concise format. 
+
+### Installation
+
+As is the case for `HierBasis`, installation of `hierbasis2` can be done via `devtools::install_github`
+
+```{r, eval = F}
+#install.packages(devtools)
+library(devtools)
+install_github("dfleis/hierbasis2")
+library(hierbasis2)
+```
+
+# Results
+
+# Discussion
+
+\newpage
+# References
+
+
+
