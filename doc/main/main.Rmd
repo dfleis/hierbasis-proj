@@ -194,9 +194,25 @@ install_github("dfleis/hierbasis2")
 library(hierbasis2)
 ```
 
-# Results
+# Simulations
 
-# Discussion
+```{r}
+library(glmnet)
+library(hierbasis2)
+```
+
+## Comparison with `glmnet`
+
+## Manipulating the Mixing Parameter $\alpha$
+
+## Manipulating Penalty Weights $w_k$
+
+## Large Data 
+
+### $n >> p$
+
+### $p >> n$
+
 
 
 \newpage
