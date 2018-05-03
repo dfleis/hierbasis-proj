@@ -46,7 +46,7 @@ $$
   y_i = \sum^p_{j = 1} f_j\left(x_{ij}\right) + \eps_i,
 $$
 
-for a sparse set of active features embedded within the design matrix $\X$. The proposal offered by @haris2016nonparametric considers the class of basis expansion estimators (@cencov1962estimation) defined by a finite set of basis functions $\left\{ \psi_k(z) \right\}^K_{k = 1}$, with some notion of increasing complexity (in $k$) and for a truncation level $K$ to be adaptively selected. Let $\Psi^{(j)}_K \in \R^{n\times K}$ be the basis expansion corresponding to the $j^\text{th}$ predictor $X_j$, with $(i, k)^{th}$ entry associated with observation $x_{ij}$ and basis function $\psi_k$,
+for a sparse set of active features $f_j(x_{ij}) \neq 0$. The proposal offered by @haris2016nonparametric considers the class of basis expansion estimators (@cencov1962estimation) defined by a finite set of basis functions $\left\{ \psi_k(z) \right\}^K_{k = 1}$, with some notion of increasing complexity (in $k$) and for a truncation level $K$ to be adaptively selected. Let $\Psi^{(j)}_K \in \R^{n\times K}$ be the basis expansion corresponding to the $j^\text{th}$ predictor $X_j$, with $(i, k)^{th}$ entry associated with observation $x_{ij}$ and basis function $\psi_k$,
 $$
   \Psi^{(j)}_{K,(i, k)} = \psi_k(x_{ij}), \quad 1 \leq k \leq K,~1 \leq i \leq n.
 $$
@@ -196,7 +196,7 @@ library(hierbasis2)
 
 # Simulations
 
-```{r}
+```{r, message = F, echo = F}
 library(glmnet)
 library(hierbasis2)
 ```
