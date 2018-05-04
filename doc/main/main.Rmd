@@ -267,7 +267,7 @@ plot(mod.glmnet.cv, sub = "glmnet")
 plot(mod.ahb.cv, sub = "HierBasis")
 ```
 
-One empirical observation with the cross-validation procedure is that the method for automatically select the tuning parameters $\lambda$ appears to set the lower bound of the sequence to be too low. If we instead manually set $\lambda$ to be within the range of $[e^{-3}, e^{1.5}]$ we find cross-validation plots that appear to be more reasonable
+One empirical observation with the cross-validation procedure is that the method used for automatically selecting the tuning parameters $\lambda$ appears to set the lower bound of the sequence to be too low. If we instead manually set $\lambda$ to be within the range of $[e^{-3}, e^{1.5}]$ we find cross-validation plots that appear to be more reasonable.
 ```{r, echo = F, fig.align = 'center', fig.height = 4, fig.width = 5}
 # additive hierbasis
 pt <- proc.time()
@@ -341,7 +341,7 @@ round(betahat.ahb$intercept, 2)
 round(betahat.ahb$X[1:3,], 2)
 ```
 
-Once again, we find `HierBasis` to be comparable to the lasso. In this case both estimates correctly select the active features after the application of the one-standard-error rule.
+Once again, we find `HierBasis` to be comparable to the lasso. In this case, both estimates correctly select the active features after the application of the one-standard-error rule.
 
 ### Additive Models
 
@@ -562,6 +562,191 @@ for (j in 1:p) {
 ## Manipulating the Mixing Parameter $\alpha$
 
 ## Manipulating Penalty Weights $w_k$
+
+We now consider the penalty term, 
+$$
+\Omega_j(\bbeta_j) = \frac{1}{\sqrt{n}} \sum^K_{k = 1} w_k \left\lVert \Psi^{(j)}_{k:K} \bbeta_{j,k:K} \right\rVert_2,
+$$
+where $w_k = k^m = (k - 1)^m$ are penalization weights for the $k^\text{th}$-order basis estimator. According to @haris2016nonparametric, the tuning parameter $m$ is similar to the number of bounded derivatives employed in the simple project estimator (@cencov1962estimation). @haris2016nonparametric recommend the use of $m=2$ or 3. We explore this suggestion below. 
+
+## Linear Model
+Once again, we consider a simple linear model
+$$
+y_i = {\bm x}_i \bbeta + \epsilon_i, 
+$$
+
+for ${\bm x}_i \sim \mathcal N_p(0, \mathbb I_p)$ and $\epsilon_i \sim \mathcal N(0, \sigma^2)$ such that the noise variance $\sigma^2$ satisfying
+$$
+  \text{SNR} = \frac{1}{\sigma^2(n - 1)} \sum^n_{i = 1} \left({\bm x}_i \bbeta\right)^2,
+$$
+
+for a fixed signal-to-noise ratio $\text{SNR} = 3$. 
+
+```{r}
+#===== parameters =====#
+set.seed(400)
+n <- 1000 # number of observations
+p <- 9 # number of predictors (excluding intercept)
+SPARSE_PCT <- 0.5 # proportion of sparse predictors
+# which predictors are sparse?
+SPARSE_IDX <- sample(2:(p + 1), size = floor(SPARSE_PCT * p)) 
+SNR <- 3 # signal-to-noise ratio (controls noise dispersions)
+beta <- rnorm(p + 1, 0, 10)
+beta[SPARSE_IDX] <- 0
+
+#===== generate data =====#
+X <- matrix(rnorm(n * p), ncol = p) # iid normal deviates
+# compute noiseless response
+ytrue <- cbind(1, X) %*% beta
+# compute noise dispersion satisfying the SNR ratio
+sigma2 <- sum(ytrue^2)/(n - 1) * 1/SNR 
+eps <- rnorm(n, 0, sqrt(sigma2))
+# compute perturbed response
+y <- ytrue + eps
+
+### split data into training and validation sets
+X_train <- X[1:(n/2),]; X_valid <- X[(n/2 + 1):n,]
+y_train <- y[1:(n/2)]; y_valid <- y[(n/2 + 1):n]
+```
+
+We will characterize the optimal m value by terms of minimizing the Root Mean Square Error (RMSE). That is, we wish to select the value of m that will minimize
+$$RMSE(y,\hat{y}) = \sqrt{\frac{\sum_i (\hat{y_i} - yi)^2}{n}}.$$
+```{r}
+rmse <- function(y, yhat) {
+  n <- length(y)
+  sqrt(sum((y - yhat)^2)/n)
+}
+#===== fit hierbasis models while varying m =====#
+c <-1 
+m.vec <- seq(0,10, 0.1)
+store <- matrix(0,nrow=length(m.vec), ncol=2)
+
+for (l in m.vec){
+  mod.hb2 <- additivehierbasis(X = X_train, y = y_train, nbasis = nbasis, m.const=l)
+  yhat.hb2 <- predict.additivehierbasis(mod.hb2)
+  store[c,1] <- l
+  store[c,2] <- rmse(y_train, yhat.hb2)
+  c <- c+1
+}
+plot(store, xlab="m values", ylab="RMSE", pch = 19, col = rgb(0, 0, 0, 0.5),
+     cex = 0.5)
+lines(store)
+```
+Interestingly, the analysis above selects an optimal m value of 0.7 in terms of minimizing the RMSE, which is much lower than the value of $m=2$ or 3 recommended by @haris2016nonparametric. In fact, choosing a value of m=2 will increase the RMSE by 1.28%, while employing a value of $m=3$ will increase the RMSE by 2.21%. 
+
+## Additive Model 
+Consider the same additive model defined above. That is,
+$$
+  y_i = 2 + 5f_1(x_{i1}) + 3f_2(x_{i2}) + 4f_3(x_{i3}) + 6f_4(x_{i4}) + \epsilon_i,
+$$
+
+such that
+\begin{align*}
+  f_1(x) &= x \\
+  f_2(x) &= (2x - 1)^2 \\
+  f_3(x) &= \frac{2 \sin(2\pi x)}{2 - \sin(2\pi x)} \\
+  f_4(x) &= 0.1 \sin(2\pi x) + 0.2 \cos(2\pi x) + 0.3 \sin^2(2\pi x) + 0.4 \cos^3(2\pi x) + 0.5 \sin^3(2\pi x).
+\end{align*}
+
+```{r}
+#===== data parameters =====#
+set.seed(680)
+n <- 1000 # number of observations
+p <- 9 # number of predictors (excluding intercept)
+SNR <- 3 # signal to noise ratio
+nbasis <- 10
+
+#===== functions =====#
+f1 <- function(x) x
+f2 <- function(x) (2 * x - 1)^2
+f3 <- function(x) 2 * sin(2 * pi * x)/(2 - sin(2 * pi * x))
+f4 <- function(x) 0.1 * sin(2 * pi * x) + 0.2 * cos(2 * pi * x) + 
+  0.3 * sin(2 * pi * x)^2 + 
+  0.4 * cos(2 * pi * x)^3 + 
+  0.5 * sin(2 * pi * x)^3
+
+#===== generate data =====#
+X <- matrix(rnorm(n * p), ncol = p) # iid normal deviates
+y1 <- 5 * f1(X[, 1])
+y2 <- 3 * f2(X[, 2])
+y3 <- 4 * f3(X[, 3])
+y4 <- 6 * f4(X[, 4])
+ytrue <- 2 + y1 + y2 + y3 + y4
+
+# compute noise dispersion satisfying the SNR ratio
+sigma2 <- sum(ytrue^2)/(n - 1) * 1/SNR 
+eps <- rnorm(n, 0, sqrt(sigma2))
+
+# compute perturbed response
+y <- ytrue + eps
+
+### split data into training and validation sets ###
+X_train <- X[1:(n/2),]
+X_valid <- X[(n/2 + 1):n,]
+y_train <- y[1:(n/2)]
+y_valid <- y[(n/2 + 1):n]
+```
+
+We will characterize the optimal m value as the quantity that minimizes the RMSE.
+
+```{r}
+#================================#
+#===== plot with varying m  =====#
+#================================#
+c <-1 
+m.vec <- seq(0,10, 0.1)
+store <- matrix(0,nrow=length(m.vec), ncol=2)
+
+for (l in m.vec){
+  mod.hb2 <- additivehierbasis(X = X_train, y = y_train, nbasis = nbasis, m.const=l)
+  yhat.hb2 <- predict.additivehierbasis(mod.hb2)
+  store[c,1] <- l
+  store[c,2] <- rmse(y_train, yhat.hb2)
+  c <- c+1
+}
+plot(store, xlab="m values", ylab="RMSE", pch = 19, col = rgb(0, 0, 0, 0.5),
+     cex = 0.5)
+lines(store)
+```
+Once again, we note that the optimal m value is lower than what is recommended by @haris2016nonparametric. The analysis above indicates that the optimal $m$ value in terms of minimizing the Root Mean Square Error is $m=1.5$ for this particular additive model. Employing a value of $m=2$ will increase the RMSE by 1.4%, while selecting a value of $m=3$ will increase the RMSE by 4.1%. 
+
+We now analyze the variation in the optimal value of m obtained by increasing values of the signal to noise ratio present in the model. 
+
+```{r}
+#====================================#
+#===== min m for varying SNR    =====#
+#====================================#
+set.seed(400)
+d <- 1
+SNR.vec <- 1:10
+out <- matrix(0,nrow=length(SNR.vec), ncol=2)
+
+for (s in SNR.vec){
+c <- 1 
+m.vec <- seq(0,10, 0.1)
+store <- matrix(0,nrow=length(m.vec), ncol=2)
+sigma2 <- sum(ytrue^2)/(n - 1) * 1/s
+eps <- rnorm(n, 0, sqrt(sigma2))
+y <- ytrue + eps
+
+  for (l in m.vec){
+    mod.hb2 <- additivehierbasis(X = X_train, y = y_train, nbasis = nbasis, m.const=l)
+    yhat.hb2 <- predict.additivehierbasis(mod.hb2)
+    store[c,1] <- l
+    store[c,2] <- rmse(y_train, yhat.hb2)
+    c <- c+1
+  }
+out[d,1] <- s
+out[d,2] <- store[which.min(store[,2]),1]
+
+d <- d+1
+}
+out
+plot(out, xlab="Signal to Noise Ratio", ylab="Optimal Value of m")
+```
+
+
+
 
 ### Polynomial Growth: Manipulating $m$
 
