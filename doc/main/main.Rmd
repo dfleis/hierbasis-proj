@@ -203,7 +203,7 @@ library(hierbasis2)
 
 ## Comparison with `glmnet`
 
-### Linear Model
+### Linear Models
 
 We begin with a simple comparison of the `HierBasis` estimators to their lasso counterparts (via `glmnet` @glmnet) in the prediction and variable selection of a simple linear model
 $$
@@ -219,9 +219,9 @@ for a fixed signal-to-noise ratio $\text{SNR} = 3$.
 
 ```{r}
 #===== parameters =====#
-set.seed(680)
-n <- 2500 # number of observations
-p <- 10 # number of predictors (excluding intercept)
+set.seed(400)
+n <- 1000 # number of observations
+p <- 9 # number of predictors (excluding intercept)
 SPARSE_PCT <- 0.5 # proportion of sparse predictors
 # which predictors are sparse?
 SPARSE_IDX <- sample(2:(p + 1), size = floor(SPARSE_PCT * p)) 
@@ -239,11 +239,9 @@ eps <- rnorm(n, 0, sqrt(sigma2))
 # compute perturbed response
 y <- ytrue + eps
 
-### split data into training and validation sets ###
-X_train <- X[1:(n/2),]
-X_valid <- X[(n/2 + 1):n,]
-y_train <- y[1:(n/2)]
-y_valid <- y[(n/2 + 1):n]
+### split data into training and validation sets
+X_train <- X[1:(n/2),]; X_valid <- X[(n/2 + 1):n,]
+y_train <- y[1:(n/2)]; y_valid <- y[(n/2 + 1):n]
 ```
 
 #### Prediction Performance
@@ -269,7 +267,17 @@ plot(mod.glmnet.cv, sub = "glmnet")
 plot(mod.ahb.cv, sub = "HierBasis")
 ```
 
-Using the validation sets we may compare the performance of the regression procedures numerically, using both the tuning parameters corresponding to the least testing error, $\lambda_{\text{min}}$, and the one-standard-error rule, $\lambda_{1\text{se}}$.
+One empirical observation with the cross-validation procedure is that the method for automatically select the tuning parameters $\lambda$ appears to set the lower bound of the sequence to be too low. If we instead manually set $\lambda$ to be within the range of $[e^{-3}, e^{1.5}]$ we find cross-validation plots that appear to be more reasonable
+```{r, echo = F, fig.align = 'center', fig.height = 4, fig.width = 5}
+# additive hierbasis
+pt <- proc.time()
+mod.ahb.cv <- cv.additivehierbasis(X = X_train, y = y_train,
+                                   lambdas = exp(seq(1.75, -3.25, length.out = 50)))
+proc.time() - pt
+plot(mod.ahb.cv, sub = "HierBasis")
+```
+
+Using the validation sets we may compare the performance of the regression procedures numerically, using the tuning parameters corresponding to the least testing error, $\lambda_{\text{min}}$, and the one-standard-error rule, $\lambda_{1\text{se}}$.
 ```{r}
 ### predict validation sets ###
 yhat.glmnet.min <- predict(mod.glmnet.cv, X_valid, s = mod.glmnet.cv$lambda.1se)
@@ -282,14 +290,10 @@ err.glmnet.1se <- yhat.glmnet.1se - y_valid
 err.ahb.min <- yhat.ahb.min - y_valid
 err.ahb.1se <- yhat.ahb.1se - y_valid
 
-mse.glmnet.min <- mean(err.glmnet.min^2)
-mse.glmnet.min.sd <- sd(err.glmnet.min)
-mse.glmnet.1se <- mean(err.glmnet.1se^2)
-mse.glmnet.1se.sd <- sd(err.glmnet.1se)
-mse.ahb.min <- mean(err.ahb.min^2)
-mse.ahb.min.sd <- sd(err.ahb.min)
-mse.ahb.1se <- mean(err.ahb.1se^2)
-mse.ahb.1se.sd <- sd(err.ahb.1se)
+mse.glmnet.min <- mean(err.glmnet.min^2); mse.glmnet.min.sd <- sd(err.glmnet.min)
+mse.glmnet.1se <- mean(err.glmnet.1se^2); mse.glmnet.1se.sd <- sd(err.glmnet.1se)
+mse.ahb.min <- mean(err.ahb.min^2); mse.ahb.min.sd <- sd(err.ahb.min)
+mse.ahb.1se <- mean(err.ahb.1se^2); mse.ahb.1se.sd <- sd(err.ahb.1se)
 
 mse <- cbind(
   c(mse.glmnet.min, mse.glmnet.1se, mse.ahb.min, mse.ahb.1se),
@@ -305,7 +309,7 @@ We see that for this regression task the `HierBasis` estimator performs comparab
 
 Prior to the comparison between the lasso and `HierBasis` estimators' ability to correctly select active features, we explore the properties of the `HierBasis` estimates. First, we investigate the paths the coefficients take as a function of the tuning parameter $\lambda$. For the simulation above we find the following coefficients (with nonzero values corresponding to the active features of $\X$)
 ```{r}
-round(beta, 2)
+round(beta[2:length(beta)], 2) # exclude intercept
 ```
 
 Plotted below are a set of graphs illustrating the coefficient paths (excluding the intercept), with each predictor presented in a separate plot. Plotted above each figure is the number of active hierarchical basis features for the corresponding value of $\lambda$, with the diffrent lines corresponding to the different hierarchical basis features (with $\lambda_{\text{1se}}$ marked by the vertial dotted line)
@@ -315,8 +319,7 @@ for (j in 1:p) {
        pred.idx = j, 
        plot.type = 'lines', 
        plot.stat = 'coef')
-  abline(v = mod.ahb.cv$lambda.1se, col = 'gray50', lty = 'dotted')
-  if (beta[j] != 0) {
+  if (beta[j + 1] != 0) {
     legend("topright", legend = "Active", bty = "n")
   }
 }
@@ -550,7 +553,6 @@ for (j in 1:p) {
        pred.idx = j, 
        plot.type = 'lines', 
        plot.stat = 'coef')
-  abline(v = mod.ahb.cv$lambda.1se, col = 'gray50', lty = 'dotted')
   if (j <= 5) {
     legend("topright", legend = "Active", bty = "n")
   }

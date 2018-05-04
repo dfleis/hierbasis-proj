@@ -16,13 +16,13 @@ f4 <- function(x) 0.1 * sin(2 * pi * x) + 0.2 * cos(2 * pi * x) +
 
 #===== data parameters =====#
 set.seed(680)
-nsims <- 100
+nsims <- 10
 
-n <- 500 # number of observations
-p <- 9 # number of predictors (excluding intercept)
+n <- 50 # number of observations
+p <- 100 # number of predictors (excluding intercept)
 SNR <- 3 # signal to noise ratio
 
-is_nonzero <- c(T, T, T, T, F, F, F, F, F)
+is_nonzero <- c(rep(T, 4), rep(F, p - 4))
 #===== generate data =====#
 pt <- proc.time()
 sim <- replicate(nsims, {
@@ -44,8 +44,7 @@ sim <- replicate(nsims, {
   # lasso
   mod.glmnet.cv <- cv.glmnet(x = X, y = y, alpha = 1)
   # additive hierbasis
-  mod.ahb.cv <- cv.additivehierbasis(X = X, y = y, 
-                                     lambdas = exp(seq(1, -3, length.out = 50)))
+  mod.ahb.cv <- cv.additivehierbasis(X = X, y = y, tol = 1e-03)
   
   sparse_test.glmnet <- as.numeric(coef(mod.glmnet.cv)[2:(p + 1)]) != 0
   sparse_test.ahb <- apply(coef(mod.ahb.cv)$X, 2, function(bcol) sum(abs(bcol)) != 0)
