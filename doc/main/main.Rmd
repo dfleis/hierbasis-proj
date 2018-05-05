@@ -571,7 +571,7 @@ $$
   y_i = 2 + 5f_1(x_{i1}) + 3f_2(x_{i2}) + 4f_3(x_{i3}) + 6f_4(x_{i4}) + \epsilon_i,
 $$
 
-with $f_1, f_2, f_3, f_4$ the same as in the previous sections. We fit the additive `HierBasis` model specifying $\texttt{nbasis} = 10$ and selecting $\lambda_{\text{1se}}$ as the tuning parameter corresponding to the fitted values of $\widehat\bbeta$. For each value of $\alpha$ we check whether the active predictors $(X_1, X_2, X_3, X_4)$ are correctly identified as being active via the fitted $\widehat\bbeta$, i.e., we check whether $\widehat\bbeta_1, ..., \widehat\bbeta_4 = {\bf 0}$ and whether $\widehat\bbeta_5, ..., \widehat\bbeta_9 = {\bf 0}$. We perform this process $\texttt{nsims} = 50$ times in order to get an estimate of the rates of variable selection/rejection, as well as computing the corresponding type I and type II errors.
+with $f_1, f_2, f_3, f_4$ the same as in the previous sections. We fit the additive `HierBasis` model specifying $\texttt{nbasis} = 10$ and selecting $\lambda_{\text{1se}}$ as the tuning parameter corresponding to the fitted values of $\widehat\bbeta$. For each value of $\alpha$ we check whether the active predictors $(X_1, X_2, X_3, X_4)$ are correctly identified as being active via the fitted $\widehat\bbeta$, i.e., we check whether $\widehat\bbeta_1, ..., \widehat\bbeta_4 \neq {\bf 0}$ and whether $\widehat\bbeta_5, ..., \widehat\bbeta_9 = {\bf 0}$. We perform this process $\texttt{nsims} = 30$ times in order to get an estimate of the rates of variable selection/rejection, as well as computing the corresponding type I and type II errors.
 
 ```{r}
 #===== functions =====#
@@ -585,7 +585,7 @@ f4 <- function(x) 0.1 * sin(2 * pi * x) + 0.2 * cos(2 * pi * x) +
 
 #===== data parameters =====#
 set.seed(680)
-nsims <- 25
+nsims <- 30
 n_alpha <- 20
 
 alpha <- seq(0, 1, length.out = n_alpha + 1); alpha <- alpha[alpha != 0]
