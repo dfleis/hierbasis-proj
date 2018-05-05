@@ -571,7 +571,7 @@ $$
   y_i = 2 + 5f_1(x_{i1}) + 3f_2(x_{i2}) + 4f_3(x_{i3}) + 6f_4(x_{i4}) + \epsilon_i,
 $$
 
-with $f_1, f_2, f_3, f_4$ the same as in the previous sections. We fit the additive `HierBasis` model specifying $\texttt{nbasis} = 10$ and selecting $\lambda_{\text{1se}}$ as the tuning parameter corresponding to the fitted values of $\widehat\bbeta$. For each value of $\alpha$ we check whether the active predictors $(X_1, X_2, X_3, X_4)$ are correctly identified as being active via the fitted $\widehat\bbeta$, i.e., we check whether $\widehat\bbeta_1, ..., \widehat\bbeta_4 = {\bf 0}$ and whether $\widehat\bbeta_5, ..., \widehat\bbeta_9 = {\bf 0}$. We perform this process $\texttt{nsims} = 50$ times in order to get an estimate of the rates of variable selection/rejection, as well as computing the corresponding Type I and Type II errors.
+with $f_1, f_2, f_3, f_4$ the same as in the previous sections. We fit the additive `HierBasis` model specifying $\texttt{nbasis} = 10$ and selecting $\lambda_{\text{1se}}$ as the tuning parameter corresponding to the fitted values of $\widehat\bbeta$. For each value of $\alpha$ we check whether the active predictors $(X_1, X_2, X_3, X_4)$ are correctly identified as being active via the fitted $\widehat\bbeta$, i.e., we check whether $\widehat\bbeta_1, ..., \widehat\bbeta_4 = {\bf 0}$ and whether $\widehat\bbeta_5, ..., \widehat\bbeta_9 = {\bf 0}$. We perform this process $\texttt{nsims} = 50$ times in order to get an estimate of the rates of variable selection/rejection, as well as computing the corresponding type I and type II errors.
 
 ```{r}
 #===== functions =====#
@@ -705,6 +705,9 @@ v_1 <- apply(p_1j * (1 - p_1j), 2, sum)/p^2
 v_0 <- apply(p_0j * (1 - p_0j), 2, sum)/p^2
 ```
 
+
+Plotted below are the empirical selection/rejection probabilities (as defined above) as a function of $\alpha$, with the corresponding standard deviations above and below the mean probabilities.
+
 ```{r, echo = F, fig.align = 'center', fig.show = 'hold', fig.height = 6, fig.width = 6.5}
 par(mfrow = c(2, 2))
 plot(NA, main = "Correct Variable\nSelection/Rejection",
@@ -754,8 +757,20 @@ points(p_01 ~ alpha, pch = 19, col = 'red', cex = 0.75)
 
 From these figures we find little evidence that manipulating $\alpha$ has a material impact on overall variable selection/rejection rates. That is, the probability that a feature is correctly identified as being either a part or not a part of our additive model appears to be independent of $\alpha$, with perhaps a slight decrease in classification rates as $\alpha \to 1$. One way to interpret this slight decrease in the feature detection performance of the `HierBasis` model is by noting that as $\alpha \to 1$ we find our penalty retains only the hierarchical term
 $$
-  \lambda \sum^p_{j = 1} \Omega_j\left(\bbeta_j\right) = \frac{\lambda}{\sqrt{n}} \sum^p_{j = 1} \sum^\texttt{nbasis}_{k = 1} w_k \left\lVert \Psi^{(j)}_{k:K} \bbeta_{j,k:K} \right\rVert_2
+  \lambda \sum^p_{j = 1} \Omega_j\left(\bbeta_j\right) = \frac{\lambda}{\sqrt{n}} \sum^p_{j = 1} \sum^\texttt{K}_{k = 1} w_k \left\lVert \Psi^{(j)}_{k:K} \bbeta_{j,k:K} \right\rVert_2
 $$
+
+and drops the second additional sparsity-inducing penalty
+$$
+  \frac{\lambda^2}{\sqrt{n}} \sum^p_{j = 1} \left\lVert \Psi^{(j)}_K \bbeta_j \right\rVert_2
+$$
+
+The effect of dropping this secondary sparsity-inducing term is made more apparent by the type I and type II figures. As $\alpha\to 1$ and this additional sparsity-inducing term vanishes we expect estimates $\widehat\bbeta$ that are hierarchically sparse (i.e. only the first few orders of the basis expansion are expected to be estimated as nonzero), but are nonsparse across the $p$ input features $\X = (X_1, ..., X_p)$. That is, as $\alpha\to 1$ we expect to see more features to be estimated as nonzero/influencial, leading a greater occurence of type I errors. 
+
+Likewise, as $\alpha \to 0$, we find that the hierarchical-sparsity term vanishes while the additional sparsity-inducing term is able to exert its full force on the penalty. As a result we expect the solutions $\widehat\bbeta$ to be sparse with respect to the input features $\X$, but nonsparse with respect to a hierarchical structure (i.e. higher degrees of the basis expansion will be estimated as nonzero). So, as $\alpha \to 0$, we expect to see fewer features selected (but each selected feature is expected to have a higher-order basis expansion), leading to a greater occurence of type II errors.
+
+The above simulation agrees with this interpretation of our mixing parameter $\alpha$, as can be seen from the increasing rate of type I errors and decreasing rate of type II errors as a function of $\alpha$.
+
 
 ## Manipulating Penalty Weights $w_k$
 
