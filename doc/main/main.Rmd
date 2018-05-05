@@ -752,6 +752,11 @@ segments(x0 = alpha,
 points(p_01 ~ alpha, pch = 19, col = 'red', cex = 0.75)
 ```
 
+From these figures we find little evidence that manipulating $\alpha$ has a material impact on overall variable selection/rejection rates. That is, the probability that a feature is correctly identified as being either a part or not a part of our additive model appears to be independent of $\alpha$, with perhaps a slight decrease in classification rates as $\alpha \to 1$. One way to interpret this slight decrease in the feature detection performance of the `HierBasis` model is by noting that as $\alpha \to 1$ we find our penalty retains only the hierarchical term
+$$
+  \lambda \sum^p_{j = 1} \Omega_j\left(\bbeta_j\right) = \frac{\lambda}{\sqrt{n}} \sum^p_{j = 1} \sum^\texttt{nbasis}_{k = 1} w_k \left\lVert \Psi^{(j)}_{k:K} \bbeta_{j,k:K} \right\rVert_2
+$$
+
 ## Manipulating Penalty Weights $w_k$
 
 ### Polynomial Growth: Manipulating $m$
