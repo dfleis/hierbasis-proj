@@ -1,6 +1,6 @@
 ---
 title: "Investigation of Sparse Hierarchical Regularization for Basis Expansion Methods"
-subtitle: "Exploration and Expansion Regression via `HierBasis`"
+subtitle: "Exploration and Expansion of Nonparametric Regression via `HierBasis`"
 author: 
   David Fleischer
   Annik Gougeon
@@ -8,7 +8,7 @@ date: "Last Update: `r format(Sys.time(), '%d %B, %Y')`"
 output:
   pdf_document:
     toc: true
-    toc_depth: 3
+    toc_depth: 4
     number_sections: true
 bibliography: ../references/references.bib
 header-includes:
@@ -210,7 +210,7 @@ $$
 y_i = {\bm x}_i \bbeta + \epsilon_i, 
 $$
 
-for ${\bm x}_i \sim \mathcal N_p(0, \mathbb I_p)$ and $\epsilon_i \sim \mathcal N(0, \sigma^2)$ such that the noise variance $\sigma^2$ satisfying
+for ${\bm x}_i \sim \mathcal N_p(0, \mathbb I_p)$ and $\epsilon_i \sim \mathcal N(0, \sigma^2)$ such that the noise variance $\sigma^2$ satisfies
 $$
   \text{SNR} = \frac{1}{\sigma^2(n - 1)} \sum^n_{i = 1} \left({\bm x}_i \bbeta\right)^2,
 $$
@@ -312,7 +312,7 @@ Prior to the comparison between the lasso and `HierBasis` estimators' ability to
 round(beta[2:length(beta)], 2) # exclude intercept
 ```
 
-Plotted below are a set of graphs illustrating the coefficient paths (excluding the intercept), with each predictor presented in a separate plot. Plotted above each figure is the number of active hierarchical basis features for the corresponding value of $\lambda$, with the diffrent lines corresponding to the different hierarchical basis features (with $\lambda_{\text{1se}}$ marked by the vertial dotted line)
+Plotted below are a set of graphs illustrating the coefficient paths (excluding the intercept), with each predictor presented in a separate plot. Plotted above each figure is the number of active hierarchical basis features for the corresponding value of $\lambda$, with the diffrent lines corresponding to the different hierarchical basis features 
 ```{r, echo = F, fig.align = 'center', fig.height = 3, fig.width = 3.5, fig.show = 'hold'}
 for (j in 1:p) {
   plot(mod.ahb.cv$model.fit, 
@@ -546,14 +546,14 @@ legend("topright", legend = c("gnet.min", "gnet.1se",
 
 #### Variable Selection
 
-We repeat the figures from the linear model variable selection section for the additive modelling environment. First, we investigate `HierBasis`'s ability to select the correct features from the design matrix via the coefficient plots as a function of $\lambda$ (with $\lambda_{\text{1se}}$ marked by the vertial dotted line)
+We repeat the figures from the linear model variable selection section for the additive modelling environment. First, we investigate `HierBasis`'s ability to select the correct features from the design matrix via the coefficient plots as a function of $\lambda$ 
 ```{r, echo = F, fig.align = 'center', fig.height = 3, fig.width = 3.5, fig.show = 'hold'}
 for (j in 1:p) {
   plot(mod.ahb.cv$model.fit, 
        pred.idx = j, 
        plot.type = 'lines', 
        plot.stat = 'coef')
-  if (j <= 5) {
+  if (j < 5) {
     legend("topright", legend = "Active", bty = "n")
   }
 }
@@ -561,27 +561,215 @@ for (j in 1:p) {
 
 ## Manipulating the Mixing Parameter $\alpha$
 
+The `HierBasis` documentation references a mixing parameter $\alpha$ which controls the degree to which the two penalty terms are balanced according to
+$$
+  \alpha \lambda \sum^p_{j = 1} \Omega_j\left(\bbeta_j\right) + (1 - \alpha)\frac{\lambda^2}{\sqrt{n}} \sum^p_{j = 1} \left\lVert \Psi^{(j)}_K\bbeta_j \right\rVert^2_2.
+$$
+
+That is, $\alpha$ controls the balance between the hierarchical penalty and the sparsity penalty. A natural question is to ask what affect does varying $\alpha$ have on variable selection? To address this we fit an additive `HierBasis` model specifying $\alpha \in \left\{ \frac{i}{n_\alpha}\right\}^{n_\alpha}_{i = 1}$. For this simulation study we consider the same additive model as before
+$$
+  y_i = 2 + 5f_1(x_{i1}) + 3f_2(x_{i2}) + 4f_3(x_{i3}) + 6f_4(x_{i4}) + \epsilon_i,
+$$
+
+with $f_1, f_2, f_3, f_4$ the same as in the previous sections. We fit the additive `HierBasis` model specifying $\texttt{nbasis} = 10$ and selecting $\lambda_{\text{1se}}$ as the tuning parameter corresponding to the fitted values of $\widehat\bbeta$. For each value of $\alpha$ we check whether the active predictors $(X_1, X_2, X_3, X_4)$ are correctly identified as being active via the fitted $\widehat\bbeta$, i.e., we check whether $\widehat\bbeta_1, ..., \widehat\bbeta_4 = {\bf 0}$ and whether $\widehat\bbeta_5, ..., \widehat\bbeta_9 = {\bf 0}$. We perform this process $\texttt{nsims} = 50$ times in order to get an estimate of the rates of variable selection/rejection, as well as computing the corresponding Type I and Type II errors.
+
+```{r}
+#===== functions =====#
+f1 <- function(x) x
+f2 <- function(x) (2 * x - 1)^2
+f3 <- function(x) 2 * sin(2 * pi * x)/(2 - sin(2 * pi * x))
+f4 <- function(x) 0.1 * sin(2 * pi * x) + 0.2 * cos(2 * pi * x) + 
+  0.3 * sin(2 * pi * x)^2 + 
+  0.4 * cos(2 * pi * x)^3 + 
+  0.5 * sin(2 * pi * x)^3
+
+#===== data parameters =====#
+set.seed(680)
+nsims <- 25
+n_alpha <- 20
+
+alpha <- seq(0, 1, length.out = n_alpha + 1); alpha <- alpha[alpha != 0]
+n <- 1500 # number of observations
+p <- 9 # number of predictors (excluding intercept)
+SNR <- 4 # signal to noise ratio
+
+is_nonzero <- c(rep(T, 4), rep(F, p - 4))
+
+#===== SIMULATE =====#
+pt <- proc.time()
+sim <- replicate(nsims, {
+  #===== generate data =====#
+  X <- matrix(rnorm(n * p), ncol = p) # iid normal deviates
+  y1 <- 5 * f1(X[, 1])
+  y2 <- 3 * f2(X[, 2])
+  y3 <- 4 * f3(X[, 3])
+  y4 <- 6 * f4(X[, 4])
+  ytrue <- 2 + y1 + y2 + y3 + y4
+  # compute noise dispersion satisfying the SNR ratio
+  sigma2 <- sum(ytrue^2)/(n - 1) * 1/SNR 
+  eps <- rnorm(n, 0, sqrt(sigma2))
+  # compute perturbed response
+  y <- ytrue + eps
+  
+  ### split data into training and validation sets
+  X_train <- X[1:(n/2),]; X_valid <- X[(n/2 + 1):n,]
+  y_train <- y[1:(n/2)]; y_valid <- y[(n/2 + 1):n]
+  
+  #===== fit models =====#
+  mods <- vector(mode = "list", length = length(alpha))
+  select.tab <- matrix(nrow = p, ncol = length(alpha))
+  err <- vector(mode = 'numeric', length = length(alpha))
+  
+  for (i in 1:length(alpha)) {
+    mods[[i]] <- cv.additivehierbasis(X = X_train, y = y_train, alpha = alpha[i])
+    
+    beta.1se <- coef(mods[[i]], lam.idx = mods[[i]]$lambda.1se.idx)
+    yhat.1se <- predict(mods[[i]]$model.fit, new.X = X_valid, 
+                        lam.idx = mods[[i]]$lambda.1se.idx)
+    beta.select <- apply(beta.1se$X, 2, function(b) sum(abs(b)) != 0)
+    
+    err[i] <- mean((yhat.1se - y_valid)^2)
+    select.tab[,i] <- beta.select
+  }
+  
+  list("select" = select.tab, "err" = err)
+})
+proc.time() - pt
+```
+
+Now, we compute the estimated classification rates
+\begin{align*}
+  p_{00, j} &= \widehat{\mathbb P}\left( \widehat\bbeta_j = {\bf 0} \mid X_j \text{ is inactive} \right) \quad \text{(True Negative)} \\
+  p_{10, j} &= \widehat{\mathbb P}\left( \widehat\bbeta_j \neq {\bf 0} \mid X_j \text{ is inactive} \right) \quad \text{(Type I)} \\
+  p_{01, j} &= \widehat{\mathbb P}\left( \widehat\bbeta_j = {\bf 0} \mid X_j \text{ is active} \right) \quad \text{(Type II)} \\
+  p_{11, j} &= \widehat{\mathbb P}\left( \widehat\bbeta_j \neq {\bf 0} \mid X_j \text{ is active} \right) \quad \text{(True Positive)}, 
+\end{align*}
+
+such that
+$$
+  \widehat{\mathbb P}\left( \widehat\bbeta_j = {\bf 0} \mid X_j \text{ is (in)active} \right) = \frac{1}{\texttt{nsims}} \sum^{\texttt{nsims}}_{l = 1} {\mathbf 1}_{\left\{ \widehat\bbeta_j = {\bf 0} \mid X_j \text{ is (in)active} \right\}}
+$$
+
+so that the estimates of the classification rates are
+$$
+  p_{n_1 n_2} = \frac{1}{p} \sum^p_{j = 1} p_{n_1n_2, j}, \quad n_1, n_2 = 0, 1.
+$$
+
+Thus,
+\begin{align*}
+  \widehat{\mathbb P}\left( \text{correct variable selection/rejective} \right) &= p_{00} + p_{11} \\
+  \widehat{\mathbb P}\left( \text{incorrect variable selection/rejection} \right) &= p_{01} + p_{10} \\
+  \widehat{\mathbb P}\left(\text{type I error}\right) &= p_{10} \\
+  \widehat{\mathbb P}\left(\text{type II error}\right) &= p_{01}.
+\end{align*}
+
+and
+$$
+  \widehat{\text{Var}}\left(p_{n_1n_2}\right) = \frac{1}{p^2 \cdot \texttt{nsims}} \sum^\texttt{nsims}_{l = 1} \sum^p_{j = 1} p_{n_1n_2, j} \cdot (1 - p_{n_1n_2, j}), \quad n_1, n_2 = 0, 1.
+$$
+
+To this end,
+```{r}
+p_00j <- Reduce("+", 
+                lapply(sim["select",], 
+                            function(ss) apply(ss, 2, 
+                                               function(s) (s == F) & (is_nonzero == F))))/nsims
+p_11j <- Reduce("+", 
+                lapply(sim["select",], 
+                            function(ss) apply(ss, 2, 
+                                               function(s) (s == T) & (is_nonzero == T))))/nsims
+p_01j <- Reduce("+", 
+                lapply(sim["select",], 
+                            function(ss) apply(ss, 2, 
+                                               function(s) (s == F) & (is_nonzero == T))))/nsims
+p_10j <- Reduce("+", 
+                lapply(sim["select",], 
+                            function(ss) apply(ss, 2, 
+                                               function(s) (s == T) & (is_nonzero == F))))/nsims
+ 
+p_1j <- p_11j + p_00j # total correct sel/rej for each predictor
+p_0j <- p_01j + p_10j # total incorrect sel/rej for each predictor
+
+# mean over all p variables
+p_00 <- colMeans(p_00j); p_11 <- colMeans(p_11j)
+p_10 <- colMeans(p_10j); p_01 <- colMeans(p_01j) 
+p_1 <- colMeans(p_1j) # total correct sel/rej
+p_0 <- colMeans(p_0j) # total incorrect sel/rej
+
+# empirical variances
+v_00 <- apply(p_00j * (1 - p_00j), 2, sum)/p^2
+v_11 <- apply(p_11j * (1 - p_11j), 2, sum)/p^2
+v_01 <- apply(p_01j * (1 - p_01j), 2, sum)/p^2
+v_10 <- apply(p_10j * (1 - p_10j), 2, sum)/p^2
+v_1 <- apply(p_1j * (1 - p_1j), 2, sum)/p^2
+v_0 <- apply(p_0j * (1 - p_0j), 2, sum)/p^2
+```
+
+```{r, echo = F, fig.align = 'center', fig.show = 'hold', fig.height = 6, fig.width = 6.5}
+par(mfrow = c(2, 2))
+plot(NA, main = "Correct Variable\nSelection/Rejection",
+     ylab = "Rate",
+     xlab = expression(alpha),
+     xlim = range(alpha),
+     ylim = range(p_1 + sqrt(v_1), p_1 - sqrt(v_1)))
+segments(x0 = alpha, 
+         x1 = alpha,
+         y0 = p_1 - sqrt(v_1),
+         y1 = p_1 + sqrt(v_1))
+points(p_1 ~ alpha, pch = 19, col = 'red', cex = 0.75)
+
+plot(NA, main = "Incorrect Variable\nSelection/Rejection",
+     ylab = "Rate",
+     xlab = expression(alpha),
+     xlim = range(alpha),
+     ylim = range(p_0 + sqrt(v_0), p_0 - sqrt(v_0)))
+segments(x0 = alpha, 
+         x1 = alpha,
+         y0 = p_0 - sqrt(v_0),
+         y1 = p_0 + sqrt(v_0))
+points(p_0 ~ alpha, pch = 19, col = 'red', cex = 0.75)
+
+plot(NA, main = "Type I Error\nVariable Selection/Rejection",
+     ylab = "Rate",
+     xlab = expression(alpha),
+     xlim = range(alpha),
+     ylim = range(p_10 + sqrt(v_10), p_10 - sqrt(v_10)))
+segments(x0 = alpha, 
+         x1 = alpha,
+         y0 = p_10 - sqrt(v_10),
+         y1 = p_10 + sqrt(v_10))
+points(p_10 ~ alpha, pch = 19, col = 'red', cex = 0.75)
+
+plot(NA, main = "Type II Error\nVariable Selection/Rejection",
+     ylab = "Rate",
+     xlab = expression(alpha),
+     xlim = range(alpha),
+     ylim = range(p_01 + sqrt(v_01), p_01 - sqrt(v_01)))
+segments(x0 = alpha, 
+         x1 = alpha,
+         y0 = p_01 - sqrt(v_01),
+         y1 = p_01 + sqrt(v_01))
+points(p_01 ~ alpha, pch = 19, col = 'red', cex = 0.75)
+```
+
 ## Manipulating Penalty Weights $w_k$
 
-We now consider the penalty term, 
+### Polynomial Growth: Manipulating $m$
+
+We now look more closely at the hierarchical-sparsity inducing penalty
 $$
 \Omega_j(\bbeta_j) = \frac{1}{\sqrt{n}} \sum^K_{k = 1} w_k \left\lVert \Psi^{(j)}_{k:K} \bbeta_{j,k:K} \right\rVert_2,
 $$
-where $w_k = k^m = (k - 1)^m$ are penalization weights for the $k^\text{th}$-order basis estimator. According to @haris2016nonparametric, the tuning parameter $m$ is similar to the number of bounded derivatives employed in the simple project estimator (@cencov1962estimation). @haris2016nonparametric recommend the use of $m=2$ or 3. We explore this suggestion below. 
+where $w_k = k^m - (k - 1)^m$ are penalization weights for the $k^\text{th}$-order basis estimator. According to @haris2016nonparametric, the tuning parameter $m$ is similar to the number of bounded derivatives employed in the simple project estimator (@cencov1962estimation) and recommends the use of $m = 2$ or 3 in order to achieve good results, and that $m = 3$ is analogous to applying a cubic spline for smoothing. We explore this suggestion, and other values of $m$, below.
 
-## Linear Model
-Once again, we consider a simple linear model
+#### Linear Model
+
+Once again, we consider a linear model
 $$
 y_i = {\bm x}_i \bbeta + \epsilon_i, 
 $$
 
-for ${\bm x}_i \sim \mathcal N_p(0, \mathbb I_p)$ and $\epsilon_i \sim \mathcal N(0, \sigma^2)$ such that the noise variance $\sigma^2$ satisfying
-$$
-  \text{SNR} = \frac{1}{\sigma^2(n - 1)} \sum^n_{i = 1} \left({\bm x}_i \bbeta\right)^2,
-$$
-
-for a fixed signal-to-noise ratio $\text{SNR} = 3$. 
-
+for ${\bm x}_i$, $\epsilon_i$, and $\sigma^2$ as defined in the previous exploration of `HierBasis`'s performance in linear models. We will characterize the optimal value(s) of $m$ by minimizing the MSE of a validation set (drawn from the same distribution as the training set). First, we generate our predictors and responses.
 ```{r}
 #===== parameters =====#
 set.seed(400)
@@ -609,44 +797,50 @@ X_train <- X[1:(n/2),]; X_valid <- X[(n/2 + 1):n,]
 y_train <- y[1:(n/2)]; y_valid <- y[(n/2 + 1):n]
 ```
 
-We will characterize the optimal m value by terms of minimizing the Root Mean Square Error (RMSE). That is, we wish to select the value of m that will minimize
-$$RMSE(y,\hat{y}) = \sqrt{\frac{\sum_i (\hat{y_i} - yi)^2}{n}}.$$
+Now, we fit multiple `HierBasis` models with varying values of $m$ for fixed value of $\lambda$ to be $\lambda = 0.25$.
 ```{r}
-rmse <- function(y, yhat) {
-  n <- length(y)
-  sqrt(sum((y - yhat)^2)/n)
-}
-#===== fit hierbasis models while varying m =====#
-c <-1 
-m.vec <- seq(0,10, 0.1)
-store <- matrix(0,nrow=length(m.vec), ncol=2)
+m.vec <- seq(0.1, 10, length.out = 100)
+mse.train <- matrix(0, nrow = length(m.vec), ncol = 2)
+mse.valid <- matrix(0, nrow = length(m.vec), ncol = 2)
 
-for (l in m.vec){
-  mod.hb2 <- additivehierbasis(X = X_train, y = y_train, nbasis = nbasis, m.const=l)
-  yhat.hb2 <- predict.additivehierbasis(mod.hb2)
-  store[c,1] <- l
-  store[c,2] <- rmse(y_train, yhat.hb2)
-  c <- c+1
+pt <- proc.time()
+for (i in 1:length(m.vec)) {
+  mod.ahb <- additivehierbasis(X = X_train, y = y_train, m.const = m.vec[i],
+                               nlam = 1, max.lambda = 0.25, lam.min.ratio = 1)
+  yhat.train <- predict.additivehierbasis(mod.ahb, new.X = X_train)
+  yhat.valid <- predict.additivehierbasis(mod.ahb, new.X = X_valid)
+  
+  err.train <- yhat.train - y_train
+  err.valid <- yhat.valid - y_valid 
+  mse.train[i,1] <- mean(err.train^2); mse.train[i,2] <- sd(err.train)
+  mse.valid[i,1] <- mean(err.valid^2); mse.valid[i,2] <- sd(err.valid)
 }
-plot(store, xlab="m values", ylab="RMSE", pch = 19, col = rgb(0, 0, 0, 0.5),
-     cex = 0.5)
-lines(store)
+proc.time() - pt
 ```
-Interestingly, the analysis above selects an optimal m value of 0.7 in terms of minimizing the RMSE, which is much lower than the value of $m=2$ or 3 recommended by @haris2016nonparametric. In fact, choosing a value of m=2 will increase the RMSE by 1.28%, while employing a value of $m=3$ will increase the RMSE by 2.21%. 
 
-## Additive Model 
-Consider the same additive model defined above. That is,
+```{r, echo = F, fig.align = 'center', fig.height = 4, fig.width = 5}
+plot(mse.valid[,1] ~ m.vec, 
+     log = 'y', main = "Test Error",
+     xlab = "m", ylab = "MSE", 
+     type = 'l', lwd = 1.5)
+```
+
+Interestingly, the analysis above selects an optimal value of $m$ to be 
+```{r}
+# test error optimal m
+m.vec[which(mse.valid[,1] == min(mse.valid[,1]))] 
+```
+
+terms of minimizing the validation MSE, which is within the range of the suggested values of $m = 2$ or 3.
+
+#### Additive Model 
+
+We now consider the same additive model defined above. That is,
 $$
   y_i = 2 + 5f_1(x_{i1}) + 3f_2(x_{i2}) + 4f_3(x_{i3}) + 6f_4(x_{i4}) + \epsilon_i,
 $$
 
-such that
-\begin{align*}
-  f_1(x) &= x \\
-  f_2(x) &= (2x - 1)^2 \\
-  f_3(x) &= \frac{2 \sin(2\pi x)}{2 - \sin(2\pi x)} \\
-  f_4(x) &= 0.1 \sin(2\pi x) + 0.2 \cos(2\pi x) + 0.3 \sin^2(2\pi x) + 0.4 \cos^3(2\pi x) + 0.5 \sin^3(2\pi x).
-\end{align*}
+with $f_1, f_2, f_3, f_4$ the same as in the previous sections, and repeat the same process of validating $m$.
 
 ```{r}
 #===== data parameters =====#
@@ -654,7 +848,6 @@ set.seed(680)
 n <- 1000 # number of observations
 p <- 9 # number of predictors (excluding intercept)
 SNR <- 3 # signal to noise ratio
-nbasis <- 10
 
 #===== functions =====#
 f1 <- function(x) x
@@ -681,79 +874,44 @@ eps <- rnorm(n, 0, sqrt(sigma2))
 y <- ytrue + eps
 
 ### split data into training and validation sets ###
-X_train <- X[1:(n/2),]
-X_valid <- X[(n/2 + 1):n,]
-y_train <- y[1:(n/2)]
-y_valid <- y[(n/2 + 1):n]
+X_train <- X[1:(n/2),]; X_valid <- X[(n/2 + 1):n,]
+y_train <- y[1:(n/2)]; y_valid <- y[(n/2 + 1):n]
 ```
 
-We will characterize the optimal m value as the quantity that minimizes the RMSE.
+We again will characterize the optimal value of $m$ as the quantity minimizing the MSE for fixed $\lambda = 0.25$.
+```{r}
+m.vec <- seq(0.1, 10, length.out = 100)
+mse.train <- matrix(0, nrow = length(m.vec), ncol = 2)
+mse.valid <- matrix(0, nrow = length(m.vec), ncol = 2)
+
+pt <- proc.time()
+for (i in 1:length(m.vec)) {
+  mod.ahb <- additivehierbasis(X = X_train, y = y_train, m.const = m.vec[i],
+                               nlam = 1, max.lambda = 0.25, lam.min.ratio = 1)
+  yhat.train <- predict.additivehierbasis(mod.ahb, new.X = X_train)
+  yhat.valid <- predict.additivehierbasis(mod.ahb, new.X = X_valid)
+  
+  err.train <- yhat.train - y_train
+  err.valid <- yhat.valid - y_valid 
+  mse.train[i,1] <- mean(err.train^2); mse.train[i,2] <- sd(err.train)
+  mse.valid[i,1] <- mean(err.valid^2); mse.valid[i,2] <- sd(err.valid)
+}
+proc.time() - pt
+```
+
+```{r, echo = F, fig.align = 'center', fig.height = 4, fig.width = 5}
+plot(mse.valid[,1] ~ m.vec, 
+     log = 'y', main = "Test Error",
+     xlab = "m", ylab = "MSE", 
+     type = 'l', lwd = 1.5)
+```
 
 ```{r}
-#================================#
-#===== plot with varying m  =====#
-#================================#
-c <-1 
-m.vec <- seq(0,10, 0.1)
-store <- matrix(0,nrow=length(m.vec), ncol=2)
-
-for (l in m.vec){
-  mod.hb2 <- additivehierbasis(X = X_train, y = y_train, nbasis = nbasis, m.const=l)
-  yhat.hb2 <- predict.additivehierbasis(mod.hb2)
-  store[c,1] <- l
-  store[c,2] <- rmse(y_train, yhat.hb2)
-  c <- c+1
-}
-plot(store, xlab="m values", ylab="RMSE", pch = 19, col = rgb(0, 0, 0, 0.5),
-     cex = 0.5)
-lines(store)
-```
-Once again, we note that the optimal m value is lower than what is recommended by @haris2016nonparametric. The analysis above indicates that the optimal $m$ value in terms of minimizing the Root Mean Square Error is $m=1.5$ for this particular additive model. Employing a value of $m=2$ will increase the RMSE by 1.4%, while selecting a value of $m=3$ will increase the RMSE by 4.1%. 
-
-We now analyze the variation in the optimal value of m obtained by increasing values of the signal to noise ratio present in the model. 
-
-```{r}
-#====================================#
-#===== min m for varying SNR    =====#
-#====================================#
-set.seed(400)
-d <- 1
-SNR.vec <- 1:10
-out <- matrix(0,nrow=length(SNR.vec), ncol=2)
-
-for (s in SNR.vec){
-c <- 1 
-m.vec <- seq(0,10, 0.1)
-store <- matrix(0,nrow=length(m.vec), ncol=2)
-sigma2 <- sum(ytrue^2)/(n - 1) * 1/s
-eps <- rnorm(n, 0, sqrt(sigma2))
-y <- ytrue + eps
-
-  for (l in m.vec){
-    mod.hb2 <- additivehierbasis(X = X_train, y = y_train, nbasis = nbasis, m.const=l)
-    yhat.hb2 <- predict.additivehierbasis(mod.hb2)
-    store[c,1] <- l
-    store[c,2] <- rmse(y_train, yhat.hb2)
-    c <- c+1
-  }
-out[d,1] <- s
-out[d,2] <- store[which.min(store[,2]),1]
-
-d <- d+1
-}
-out
-plot(out, xlab="Signal to Noise Ratio", ylab="Optimal Value of m")
+# test error optimal m
+m.vec[which(mse.valid[,1] == min(mse.valid[,1]))] 
 ```
 
-
-
-
-### Polynomial Growth: Manipulating $m$
-
-### Exponential Growth
-
-### Logarithmic Growth
-
+Once again, we note that the optimal $m$ within the suggested range of $m = 2$ or 3, as noted in @haris2016nonparametric. The analysis above indicates that the optimal $m$ value in terms of minimizing the MSE is found at $m = 3$ for this particular additive model. 
 
 \newpage
 # References
